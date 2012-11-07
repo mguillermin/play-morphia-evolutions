@@ -6,6 +6,7 @@
 
 # Ignore Play! working directory #
 db
+dist
 eclipse
 lib
 log
