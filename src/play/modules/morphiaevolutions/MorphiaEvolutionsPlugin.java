@@ -84,7 +84,7 @@ public class MorphiaEvolutionsPlugin extends PlayPlugin {
             System.out.println("");
             System.out.println(e.error);
             System.out.println("");
-            System.out.println("~ Please correct it manually, and mark it resolved by running `play evolutions:resolve`");
+            System.out.println("~ Please correct it manually, and mark it resolved by running `play morphiaevolutions:resolve`");
             System.out.println("~");
             return;
         } catch (InvalidDatabaseRevision e) {
@@ -143,8 +143,8 @@ public class MorphiaEvolutionsPlugin extends PlayPlugin {
                 System.out.println("");
                 System.out.println("# ------------------------------------------------------------------------------");
                 System.out.println("");
-                System.out.println("~ Run `play evolutions:apply` to automatically apply this script to the database");
-                System.out.println("~ or apply it yourself and mark it done using `play evolutions:markApplied`");
+                System.out.println("~ Run `play morphiaevolutions:apply` to automatically apply this script to the database");
+                System.out.println("~ or apply it yourself and mark it done using `play morphiaevolutions:markApplied`");
                 System.out.println("~");
             }
 
@@ -198,7 +198,7 @@ public class MorphiaEvolutionsPlugin extends PlayPlugin {
             } catch (InvalidDatabaseRevision e) {
                 Logger.warn("");
                 Logger.warn("Your database is not up to date.");
-                Logger.warn("Use `play evolutions` command to manage database evolutions.");
+                Logger.warn("Use `play morphiaevolutions` command to manage database evolutions.");
                 throw e;
             }
         }
