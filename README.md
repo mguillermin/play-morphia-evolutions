@@ -20,7 +20,7 @@ Add the dependency for this module in your application `conf/dependencies.yml`
 	repositories:
 	    - morphiaevolutions:
 	        type: http
-	        artifact: http://mguillermin.github.com/play-morphia-evolutions/releases/[module]-[revision].zip
+	        artifact: http://mguillermin.github.com/play-morphia-evolutions/dist/[module]-[revision].zip
 	        containts:
 	            - morphiaevolutions -> *
   
@@ -49,5 +49,33 @@ The syntax of these scripts is quite similar to the standard Play evolution scri
 	
 	db.foo.remove({a: 1})	
 	
-if you create
+You can then check your database state using the `morphiaevolutions` command:
+
+	$ play morphiaevolutions
+	~        _            _ 
+	~  _ __ | | __ _ _  _| |
+	~ | '_ \| |/ _' | || |_|
+	~ |  __/|_|\____|\__ (_)
+	~ |_|            |__/   
+	~
+	~ play! 1.2.5, http://www.playframework.org
+	~
+	~ Application revision is 1 [432895f] and Database revision is 0 [da39a3e]
+	~
+	~ Your database needs evolutions!
 	
+	# ------------------------------------------------------------------------------
+	
+	// --- Rev:1,Ups - 432895f
+	
+	  db.foo.insert({a: 1})
+	
+	# ------------------------------------------------------------------------------
+	
+	~ Run `play morphiaevolutions:apply` to automatically apply this script to the database
+	~ or apply it yourself and mark it done using `play morphiaevolutions:markApplied`
+	~
+	
+In dev mode, if you launch your app using `play run` you will see this in your browser.
+
+The other command `apply`, `markApplied`, `resolve` works as their standard Play evolutions equivalents. see [Play evolutions documentation](http://www.playframework.org/documentation/1.2.5/evolutions).
