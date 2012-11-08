@@ -20,7 +20,7 @@ Add the dependency for this module in your application `conf/dependencies.yml`
 	repositories:
 	    - morphiaevolutions:
 	        type: http
-	        artifact: http://mguillermin.github.com/play-morphia-evolutions/dist/[module]-[revision].zip
+	        artifact: http://cloud.github.com/downloads/mguillermin/play-morphia-evolutions/[module]-[revision].zip
 	        containts:
 	            - morphiaevolutions -> *
   
