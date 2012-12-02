@@ -23,6 +23,11 @@ import java.lang.Override;
 import java.util.*;
 
 
+/**
+ * Handles migration of data when using the Morphia module.
+ *
+ * Based on the original Play Evolutions mechanism
+ */
 public class MorphiaEvolutionsPlugin extends PlayPlugin {
     public static final String EVOLUTIONS_COLLECTION = "evolutions";
     public static final String FIELD_REVISION = "revision";
@@ -36,7 +41,19 @@ public class MorphiaEvolutionsPlugin extends PlayPlugin {
     public static final File evolutionsDirectory = Play.getFile("db/evolutions");
 
 
+    /**
+     * Main method is called from play "tasks"
+     */
     public static void main(String[] args) {
+
+        /** Check that evolutions are enabled **/
+        if (!evolutionsDirectory.exists()) {
+            System.out.println("~ Evolutions are not enabled. Create a db/evolutions directory to create your first 1.sql evolution script.");
+            System.out.println("~");
+            return;
+        }
+
+        /** Start the Morphia plugin **/
         Play.id = System.getProperty("play.id");
         Play.applicationPath = new File(System.getProperty("application.path"));
         Play.guessFrameworkPath();
@@ -204,33 +221,31 @@ public class MorphiaEvolutionsPlugin extends PlayPlugin {
         }
     }
 
-    public synchronized static void checkEvolutionsState() {
-        List<Evolution> evolutionScript = getEvolutionScript();
+    /**
+     * Checks if evolutions is disabled in application.conf (property "morphia.evolutions.enabled")
+     */
+    private boolean isDisabled() {
+        return "false".equals(Play.configuration.getProperty("morphia.evolutions.enabled", "true"));
+    }
 
-        DB db = MorphiaPlugin.ds().getDB();
+
+    public static synchronized void resolve(int revision) {
         try {
-            if (db.collectionExists(EVOLUTIONS_COLLECTION)) {
-                DBCursor results = db.getCollection(EVOLUTIONS_COLLECTION).find(new BasicDBObject(FIELD_STATE, "/applying_.*/"));
-                for (DBObject result : results) {
-                    String script = String.format("# --- Rev:%s,%s - %s\n\n%s",
-                            result.get(FIELD_REVISION),
-                            result.get(FIELD_STATE).toString().equals("applying_up") ? "Ups" : "Downs",
-                            result.get(FIELD_HASH),
-                            result.get(FIELD_STATE).toString().equals("applying_up") ? result.get(FIELD_APPLY_SCRIPT) : result.get(FIELD_REVERT_SCRIPT)
-                    );
-                    String error = result.get(FIELD_LAST_PROBLEM).toString();
-                    int revision = Integer.parseInt(result.get(FIELD_REVISION).toString());
-                    throw new InconsistentDatabase(script, error, revision);
-                }
-            }
+            DB db = MorphiaPlugin.ds().getDB();
+            BasicDBList queryUpdate = new BasicDBList();
+            queryUpdate.add(new BasicDBObject(FIELD_REVISION, revision));
+            queryUpdate.add(new BasicDBObject(FIELD_STATE, "applying_up"));
+            db.getCollection(EVOLUTIONS_COLLECTION).update(
+                    queryUpdate,
+                    new BasicDBObject("$set", new BasicDBObject(FIELD_STATE, "applied")));
+
+            BasicDBList queryDelete = new BasicDBList();
+            queryDelete.add(new BasicDBObject(FIELD_REVISION, revision));
+            queryDelete.add(new BasicDBObject(FIELD_STATE, "applying_down"));
+            db.getCollection(EVOLUTIONS_COLLECTION).remove(queryDelete);
         } catch (Exception e) {
             throw new UnexpectedException(e);
         }
-
-        if (!evolutionScript.isEmpty()) {
-            throw new InvalidDatabaseRevision(toHumanReadableScript(evolutionScript));
-        }
-
     }
 
     public static synchronized boolean applyScript(boolean runScript) {
@@ -279,6 +294,57 @@ public class MorphiaEvolutionsPlugin extends PlayPlugin {
         }
     }
 
+    public static String toHumanReadableScript(List<Evolution> evolutionScript) {
+        // Construct the script
+        StringBuilder sql = new StringBuilder();
+        boolean containsDown = false;
+        for (Evolution evolution : evolutionScript) {
+            if (!evolution.applyUp) {
+                containsDown = true;
+            }
+            sql.append("// --- Rev:").append(evolution.revision).append(",").append(evolution.applyUp ? "Ups" : "Downs").append(" - ").append(evolution.hash.substring(0, 7)).append("\n");
+            sql.append("\n");
+            sql.append(evolution.applyUp ? evolution.js_up : evolution.js_down);
+            sql.append("\n\n");
+        }
+
+        if (containsDown) {
+            sql.insert(0, "// !!! WARNING! This script contains DOWNS evolutions that are likely destructives\n\n");
+        }
+
+        return sql.toString().trim();
+    }
+
+    public synchronized static void checkEvolutionsState() {
+        List<Evolution> evolutionScript = getEvolutionScript();
+
+        DB db = MorphiaPlugin.ds().getDB();
+        try {
+            if (db.collectionExists(EVOLUTIONS_COLLECTION)) {
+                DBCursor results = db.getCollection(EVOLUTIONS_COLLECTION).find(new BasicDBObject(FIELD_STATE, "/applying_.*/"));
+                for (DBObject result : results) {
+                    String script = String.format("# --- Rev:%s,%s - %s\n\n%s",
+                            result.get(FIELD_REVISION),
+                            result.get(FIELD_STATE).toString().equals("applying_up") ? "Ups" : "Downs",
+                            result.get(FIELD_HASH),
+                            result.get(FIELD_STATE).toString().equals("applying_up") ? result.get(FIELD_APPLY_SCRIPT) : result.get(FIELD_REVERT_SCRIPT)
+                    );
+                    String error = result.get(FIELD_LAST_PROBLEM).toString();
+                    int revision = Integer.parseInt(result.get(FIELD_REVISION).toString());
+                    throw new InconsistentDatabase(script, error, revision);
+                }
+            }
+        } catch (Exception e) {
+            throw new UnexpectedException(e);
+        }
+
+        if (!evolutionScript.isEmpty()) {
+            throw new InvalidDatabaseRevision(toHumanReadableScript(evolutionScript));
+        }
+
+    }
+
+
     public static synchronized List<Evolution> getEvolutionScript() {
         Stack<Evolution> app = listApplicationEvolutions();
         Stack<Evolution> db = listDatabaseEvolutions();
@@ -309,20 +375,6 @@ public class MorphiaEvolutionsPlugin extends PlayPlugin {
 
         return script;
     }
-
-    public synchronized static Stack<Evolution> listDatabaseEvolutions() {
-        Stack<Evolution> evolutions = new Stack<Evolution>();
-        evolutions.add(new Evolution(0, "", "", false));
-        DB db = MorphiaPlugin.ds().getDB();
-        if (db.collectionExists(EVOLUTIONS_COLLECTION)) {
-            DBCursor results = db.getCollection(EVOLUTIONS_COLLECTION).find();
-            for (DBObject result : results) {
-                evolutions.push(new Evolution(Double.valueOf(result.get(FIELD_REVISION).toString()).intValue(), result.get(FIELD_APPLY_SCRIPT).toString(), result.get(FIELD_REVERT_SCRIPT).toString(), false));
-            }
-        }
-        return evolutions;
-    }
-
 
     public synchronized static Stack<Evolution> listApplicationEvolutions() {
         Stack<Evolution> evolutions = new Stack<Evolution>();
@@ -358,56 +410,18 @@ public class MorphiaEvolutionsPlugin extends PlayPlugin {
         return evolutions;
     }
 
-    public static synchronized void resolve(int revision) {
-        try {
-            DB db = MorphiaPlugin.ds().getDB();
-            BasicDBList queryUpdate = new BasicDBList();
-            queryUpdate.add(new BasicDBObject(FIELD_REVISION, revision));
-            queryUpdate.add(new BasicDBObject(FIELD_STATE, "applying_up"));
-            db.getCollection(EVOLUTIONS_COLLECTION).update(
-                    queryUpdate,
-                    new BasicDBObject("$set", new BasicDBObject(FIELD_STATE, "applied")));
-
-            BasicDBList queryDelete = new BasicDBList();
-            queryDelete.add(new BasicDBObject(FIELD_REVISION, revision));
-            queryDelete.add(new BasicDBObject(FIELD_STATE, "applying_down"));
-            db.getCollection(EVOLUTIONS_COLLECTION).remove(queryDelete);
-        } catch (Exception e) {
-            throw new UnexpectedException(e);
-        }
-    }
-
-
-
-    public static String toHumanReadableScript(List<Evolution> evolutionScript) {
-        // Construct the script
-        StringBuilder sql = new StringBuilder();
-        boolean containsDown = false;
-        for (Evolution evolution : evolutionScript) {
-            if (!evolution.applyUp) {
-                containsDown = true;
+    public synchronized static Stack<Evolution> listDatabaseEvolutions() {
+        Stack<Evolution> evolutions = new Stack<Evolution>();
+        evolutions.add(new Evolution(0, "", "", false));
+        DB db = MorphiaPlugin.ds().getDB();
+        if (db.collectionExists(EVOLUTIONS_COLLECTION)) {
+            DBCursor results = db.getCollection(EVOLUTIONS_COLLECTION).find();
+            for (DBObject result : results) {
+                evolutions.push(new Evolution(Double.valueOf(result.get(FIELD_REVISION).toString()).intValue(), result.get(FIELD_APPLY_SCRIPT).toString(), result.get(FIELD_REVERT_SCRIPT).toString(), false));
             }
-            sql.append("// --- Rev:").append(evolution.revision).append(",").append(evolution.applyUp ? "Ups" : "Downs").append(" - ").append(evolution.hash.substring(0, 7)).append("\n");
-            sql.append("\n");
-            sql.append(evolution.applyUp ? evolution.js_up : evolution.js_down);
-            sql.append("\n\n");
         }
-
-        if (containsDown) {
-            sql.insert(0, "// !!! WARNING! This script contains DOWNS evolutions that are likely destructives\n\n");
-        }
-
-        return sql.toString().trim();
+        return evolutions;
     }
-
-    /**
-     * Checks if evolutions is disabled in application.conf (property "morphia.evolutions.enabled")
-     */
-    private boolean isDisabled() {
-        return "false".equals(Play.configuration.getProperty("morphia.evolutions.enabled", "true"));
-    }
-
-
 
     /**
      * Datastructure representing one evolution.
