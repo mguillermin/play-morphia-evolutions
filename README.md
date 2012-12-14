@@ -20,7 +20,7 @@ Add the dependency for this module in your application `conf/dependencies.yml`
 	repositories:
 	    - morphiaevolutions:
 	        type: http
-	        artifact: http://cloud.github.com/downloads/cleverage/play-morphia-evolutions/[module]-[revision].zip
+	        artifact: https://github.com/cleverage/play-morphia-evolutions/raw/master/dist/[module]-[revision].zip
 	        containts:
 	            - morphiaevolutions -> *
   
