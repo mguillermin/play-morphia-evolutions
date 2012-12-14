@@ -15,7 +15,7 @@ Add the dependency for this module in your application `conf/dependencies.yml`
 	require:
 	    - play
 	    - play -> morphia 1.2.9
-	    - morphiaevolutions -> morphiaevolutions 0.1
+	    - morphiaevolutions -> morphiaevolutions 0.2
 	
 	repositories:
 	    - morphiaevolutions:

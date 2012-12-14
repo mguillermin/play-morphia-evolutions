@@ -61,6 +61,12 @@ public class MorphiaEvolutionsPlugin extends PlayPlugin {
         Play.javaPath = new ArrayList<VirtualFile>();
         Play.classes = new ApplicationClasses();
         Play.classloader = new ApplicationClassloader();
+        /** Check that evolutions are enabled **/
+        if (isDisabled(Play.configuration)) {
+            System.out.println("~ Evolutions are not enabled. You can enable it in your application.conf with 'morphia.evolutions.enabled=true'");
+            System.out.println("~");
+            return;
+        }
         Logger.init();
         Logger.setUp("ERROR");
         new MorphiaPlugin().onApplicationStart();
@@ -225,7 +231,15 @@ public class MorphiaEvolutionsPlugin extends PlayPlugin {
      * Checks if evolutions is disabled in application.conf (property "morphia.evolutions.enabled")
      */
     private boolean isDisabled() {
-        return "false".equals(Play.configuration.getProperty("morphia.evolutions.enabled", "true"));
+        return isDisabled(Play.configuration);
+
+    }
+
+    /**
+     * Checks if evolutions is disabled in application.conf (property "morphia.evolutions.enabled")
+     */
+    private static boolean isDisabled(Properties configuration) {
+        return "false".equals(configuration.getProperty("morphia.evolutions.enabled", "true"));
     }
 
 

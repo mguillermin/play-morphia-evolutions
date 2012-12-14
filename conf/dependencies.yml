@@ -1,4 +1,4 @@
-self: play -> morphiaevolutions 0.1
+self: play -> morphiaevolutions 0.2
 
 require:
     - play
